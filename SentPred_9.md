@@ -80,7 +80,7 @@ Neg_VocabList <- gsub("[^[:alnum:] ]", "", Neg_VocabList)
 Neg_VocabList <- tolower(Neg_VocabList)
 Neg_VocabList_Freq <- table(Neg_VocabList)
 #### Find pos neg differences ####
-HighVocabFreq <- VocabFreq[which(VocabFreq > 100)]
+HighVocabFreq <- VocabFreq[which(VocabFreq > 200)]
 WordsOfInterest <- names(HighVocabFreq)
 WordDiffs.df <- as.data.frame (matrix(nrow = length(WordsOfInterest), ncol = 2))
 colnames(WordDiffs.df) <- c("Word", "Freq_Diff")
@@ -267,11 +267,6 @@ p2
 ```
 
 ![](SentPred_9_files/figure-markdown_github/unnamed-chunk-5-1.png)
-
-``` r
-#p2 <- p1
-#p2
-```
 
 These plots show quite clearly that the news media outlets differ quite drastically in the sentiment of their stories.
 
