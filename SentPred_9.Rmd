@@ -118,7 +118,7 @@ TempIndex <- match(sort(WordDiffs.df$Freq_Diff, decreasing = T)[1:200], WordDiff
 #WordDiffs.df$Word[TempIndex]
 #WordDiffs.df$Word[which(sort(WordDiffs.df$Freq_Diff, decreasing = F)[1:10]]
 ```
-## Get News Latest Top Articles From Popular US Media
+## Get Latest Top News Articles From Popular US Media
 
 We'll now use an API from [News API](https://newsapi.org/) to obtain the top news at this time. After that, we'll process the news articles and make a data-frame that contains the number of times the most polar words occur in those articles.
 
