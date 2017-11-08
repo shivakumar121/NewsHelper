@@ -22,9 +22,11 @@ As this is a proof of concept, we are not going to train an NLP model, but show 
 We will create two data-frames of positive and negative reviews. This would form our vocabulary for this task.
 
 ```{r}
+library(stringr)
 TrainDataDir <- "/media/TDI/TDIChallenge/Question_3/News/IMDBReviews/aclImdb/train"
 File_Names <- list.files(path = paste0(TrainDataDir,"/pos"), pattern = ".txt$")
-MaxFiles <- 200
+#MaxFiles <- 200
+MaxFiles <- length(File_Names)
 Pos.reviews.df <- as.data.frame(matrix(nrow = MaxFiles, ncol = 2))
 colnames(Pos.reviews.df) <- c("Nome_of_File", "ReviewContent")
 FileName_temp <- NULL
@@ -45,6 +47,7 @@ for (i in 1:MaxFiles) ### change to (length(File_Names)) later
 ### Now the same for negative reviews ###
 
 File_Names <- list.files(path = paste0(TrainDataDir,"/neg"), pattern = ".txt$")
+MaxFiles <- length(File_Names)
 Neg.reviews.df <- as.data.frame(matrix(nrow = MaxFiles, ncol = 2))
 colnames(Neg.reviews.df) <- c("Nome_of_File", "ReviewContent")
 FileName_temp <- NULL
@@ -80,6 +83,7 @@ VocabListEndoded.df$Int <- 1:length(VocabListUnique)
 VocabListEndoded <- as.list(1:length(VocabListUnique))
 names(VocabListEndoded) <- VocabListUnique
 WordToInt <- NULL
+## Add Word to Integer column to Positive reviews dataset ####
 for (i in 1:nrow(Pos.reviews.df))
 {
   TempWordToInt <- rep(0, times = MaxWords)
@@ -99,7 +103,106 @@ for (i in 1:nrow(Pos.reviews.df))
   WordToInt <- c(WordToInt,paste0(TempWordToInt, collapse = ","))
 }
 Pos.reviews.df$WordToInt <- WordToInt
+## Add Word to Integer column to Negative reviews dataset in the same manner as above ####
+WordToInt <- NULL
+for (i in 1:nrow(Neg.reviews.df))
+{
+  TempWordToInt <- rep(0, times = MaxWords)
+  Review_Words <- str_split(Neg.reviews.df$ReviewContent[i], pattern = " ")
+  Review_Words <- unlist(Review_Words)
+  Review_Words <- gsub("[^[:alnum:] ]", "", Review_Words)
+  Review_Words <- tolower(Review_Words)
+  Review_Words <- Review_Words[nchar(Review_Words) > 0]
+  if (length(Review_Words) > MaxWords)
+  {
+    Review_Words <- Review_Words[1:MaxWords]
+  }
+  
+  TempIndex <- match(Review_Words, VocabListEndoded.df$Word)
+  WordsListLength <- length(Review_Words)
+  TempWordToInt[(MaxWords-WordsListLength+1):MaxWords] <- VocabListEndoded.df$Int[TempIndex]
+  WordToInt <- c(WordToInt,paste0(TempWordToInt, collapse = ","))
+}
+Neg.reviews.df$WordToInt <- WordToInt
 ```
+
+## Build the Graphs
+
+```{r}
+## Split inputs into train and test and add output labels ####
+OutPutLabel <- rep(1, times = nrow(Pos.reviews.df))
+Pos.reviews.df$OutputLabel <- OutPutLabel
+OutPutLabel <- rep(0, times = nrow(Neg.reviews.df))
+Neg.reviews.df$OutputLabel <- OutPutLabel
+Merged.reviews.df <- as.data.frame (rbind(Pos.reviews.df, Neg.reviews.df))
+## Randomize the data frame
+Index <- sample (1:nrow(Merged.reviews.df), size = nrow(Merged.reviews.df), replace = F)
+Merged.reviews.df <- Merged.reviews.df[Index,]
+SplitFrac <- 0.2
+TestIndex <- sample(1:nrow(Merged.reviews.df), size = SplitFrac*nrow(Merged.reviews.df))
+Merged.reviews.df.Test <- Merged.reviews.df[TestIndex,]
+Merged.reviews.df.Train <- Merged.reviews.df[-TestIndex,]
+
+
+library(keras)
+VocabSize <- length(VocabListUnique) + 1 ### Add the padding of 0 
+main_input <- layer_input(shape = c(MaxWords), dtype = 'int64', name = 'main_input')
+EmbedSize <- 512
+lstm_out <- main_input %>% 
+  layer_embedding(input_dim = VocabSize, output_dim = EmbedSize, input_length = MaxWords) %>% 
+  layer_lstm(units = 32)
+auxiliary_output <- lstm_out %>% 
+  layer_dense(units = 1, activation = 'sigmoid', name = 'aux_output')
+
+#auxiliary_input <- layer_input(shape = c(5), name = 'aux_input')
+
+main_output <- lstm_out %>%  
+  layer_dense(units = 64, activation = 'relu') %>% 
+  layer_dense(units = 1, activation = 'sigmoid', name = 'main_output')
+
+model <- keras_model(
+  inputs = main_input, 
+  outputs = c(main_output, auxiliary_output)
+)
+
+summary(model)
+
+model %>% compile(
+  optimizer = 'rmsprop',
+  loss = 'binary_crossentropy',
+  loss_weights = c(1.0, 0.2)
+)
+InputGen <- str_split(Merged.reviews.df.Train$WordToInt, pattern = ",")
+InputGenArrary <- NULL
+InputGenArrary <- as.array(matrix(nrow=nrow(Merged.reviews.df.Train),ncol=MaxWords))
+for (i in 1:length(InputGen))
+{
+  InputGenArrary[i,] <- as.integer(InputGen[[i]])
+}
+#tt=as.array(tt)
+history <- model %>% fit(
+  x = (main_input = InputGenArrary),
+  y = list(main_output = Merged.reviews.df.Train$OutputLabel, aux_output = Merged.reviews.df.Train$OutputLabel),
+  epochs = 2,
+  batch_size = 32
+)
+
+plot(history)
+#########################################################
+LstmSize = 256
+LstmLayers = 1
+BatchSize = 500
+LearningRate = 0.001
+
+# Create the graph object
+graph = tf.Graph()
+# Add nodes to the graph
+with graph.as_default():
+    inputs_ = tf.placeholder(tf.int32, [None, None], name='inputs')
+    labels_ = tf.placeholder(tf.int32, [None, None], name='labels')
+    keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+```
+
 
 ## Extract Polarity Of The Words
 
